@@ -4,6 +4,8 @@ import java.util.*;
 public class MatrixFileIO {
     // Matrix separator in file
     private static final String MATRIX_SEPARATOR = "---";
+
+    // Read matrices from file
     public static List<double[][]> readMatrices(String filename) throws IOException {
         List<double[][]> matrices = new ArrayList<>();
 
@@ -59,23 +61,46 @@ public class MatrixFileIO {
         return matrices;
     }
 
+    // Print matrix from parameter
     public static void printMatrix(double[][] matrix) {
         for (double[] row : matrix) {
             System.out.println(Arrays.toString(row));
         }
     }
 
+
     public static List<double[][]> multiplyMatrices(List<double[][]> matrices) {
+        /*
+        Current implementation will multiply every set of two matrices ( in a row )
+        i.e. Matrix A, Matrix B, Matrix C, Matrix D] will multiply A*B, B*C, C*D
+         */
         List<double[][]> result = new ArrayList<>();
+
+        // Check matrix dimensions
         for (int i = 0; i < matrices.size() - 1; i++) {
             double[][] matrix1 = matrices.get(i);
             double[][] matrix2 = matrices.get(i + 1);
             if (matrix1[0].length != matrix2.length) {
                 throw new IllegalArgumentException("Matrix dimensions don't match for multiplication");
-            } else {
-                System.out.print("Sizes match");
             }
         }
+        // Multiply matrices
+        for (int i = 0; i < matrices.size() - 1; i++) {
+            double[][] matrix1 = matrices.get(i);
+            double[][] matrix2 = matrices.get(i + 1);
+            int rows = matrix1.length;
+            int cols = matrix2[0].length;
+            double[][] product = new double[rows][cols];
+            for (int j = 0; j < rows; j++) {
+                for (int k = 0; k < cols; k++) {
+                    for (int l = 0; l < matrix1[0].length; l++) {
+                        product[j][k] += matrix1[j][l] * matrix2[l][k];
+                    }
+                }
+            }
+            result.add(product);
+        }
+
         return result;
     }
 
@@ -84,10 +109,17 @@ public class MatrixFileIO {
         try {
             // Read matrices back
             List<double[][]> readMatrices = readMatrices("multiple_matrices.txt");
-            multiplyMatrices(readMatrices);
+
+            // Multiply matrices and print result
+            List<double[][]> result = multiplyMatrices(readMatrices);
+            System.out.println("Result:");
+            for (int i = 0; i < result.size(); i++) {
+                System.out.println("\nMatrix " + (i + 1) + ":");
+                printMatrix(result.get(i));
+            }
 
             // Print read matrices
-            System.out.println("Read " + readMatrices.size() + " matrices:");
+            System.out.println("\n\nRead " + readMatrices.size() + " matrices from file:");
             for (int i = 0; i < readMatrices.size(); i++) {
                 System.out.println("\nMatrix " + (i + 1) + ":");
                 printMatrix(readMatrices.get(i));
