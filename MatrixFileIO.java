@@ -134,6 +134,7 @@ public class MatrixFileIO {
     }
 
     // Subtract two matrices
+
     public static double[][] subtractMatrices(double[][] matrix1, double[][] matrix2) {
         // Check matrix dimensions
         if (matrix1.length != matrix2.length || matrix1[0].length != matrix2[0].length) {
@@ -172,10 +173,10 @@ public class MatrixFileIO {
             double j;
             double k;
             double l;
-            m1 = (matrix1[0][0] + matrix1[1][0]) * (matrix2[0][0] + matrix2[1][0]);
+            m1 = (matrix1[0][0] + matrix1[1][0]) * (matrix2[0][0] + matrix2[0][1]);
             m2 = (matrix1[0][1] + matrix1[1][1]) * (matrix2[1][0] + matrix2[1][1]);
             m3 = (matrix1[0][0] - matrix1[1][1]) * (matrix2[0][0] + matrix2[1][1]);
-            m4 = matrix1[0][0] * (matrix2[1][0] - matrix2[1][1]);
+            m4 = matrix1[0][0] * (matrix2[0][1] - matrix2[1][1]);
             m5 = (matrix1[1][0] + matrix1[1][1]) * matrix2[0][0];
             m6 = (matrix1[0][0] + matrix1[0][1]) * matrix2[1][1];
             m7 = matrix1[1][1] * (matrix2[1][0]-matrix2[0][0]);
@@ -222,18 +223,25 @@ public class MatrixFileIO {
                 }
             }
             
-            m1 = StrassenMultiplication((addMatrices(matrix1A, matrix1C)) , addMatrices(matrix2E, matrix2G));
-            m2 = (matrix1[0][1] + matrix1[1][1]) * (matrix2[1][0] + matrix2[1][1]);
-            m3 = (matrix1[0][0] - matrix1[1][1]) * (matrix2[0][0] + matrix2[1][1]);
-            m4 = matrix1[0][0] * (matrix2[1][0] - matrix2[1][1]);
-            m5 = (matrix1[1][0] + matrix1[1][1]) * matrix2[0][0];
-            m6 = (matrix1[0][0] + matrix1[0][1]) * matrix2[1][1];
-            m7 = matrix1[1][1] * (matrix2[1][0]-matrix2[0][0]);
-            result[0][0] = m2 + m3 - m6 + m7;
-            result[0][1] = m4 + m6;
-            result[1][0] = m5 + m7;
-            result[1][1] = m1 - m3 - m4 - m5;
+            m1 = StrassenMultiplication(addMatrices(matrix1A, matrix1C), addMatrices(matrix2E, matrix2F));
+            m2 = StrassenMultiplication(addMatrices(matrix1C, matrix1D), matrix2E);
+            m3 = StrassenMultiplication(matrix1A, subtractMatrices(matrix2F, matrix2H));
+            m4 = StrassenMultiplication(matrix1D, subtractMatrices(matrix2G, matrix2E));
+            m5 = StrassenMultiplication(addMatrices(matrix1A, matrix1B), matrix2H);
+            m6 = StrassenMultiplication(subtractMatrices(matrix1C, matrix1A), addMatrices(matrix2E, matrix2F));
+            m7 = StrassenMultiplication(subtractMatrices(matrix1B, matrix1D), addMatrices(matrix2G, matrix2H));
+            
+            double[][] result = new double[matrix1.length][matrix1[0].length];
+            for (int i = 0; i < matrixSize; i++) {
+                for (int j = 0; j < matrixSize; j++) {
+                    result[i][j] = m1[i][j] + m4[i][j] - m5[i][j] + m7[i][j];
+                    result[i][j + matrixSize] = m3[i][j] + m5[i][j];
+                    result[i + matrixSize][j] = m2[i][j] + m4[i][j];
+                    result[i + matrixSize][j + matrixSize] = m1[i][j] - m2[i][j] + m3[i][j] + m6[i][j];
+                }
+            }
             return result;
+        }
 
 
 
@@ -245,24 +253,13 @@ public class MatrixFileIO {
 
     
     // Strassen's matrix multiplication
+
+    double[][] result;
+
     public static List<double[][]> StrassenMultiplicationAndSquareCheck(List<double[][]> matrices) {
-        List<double[][]> result = new ArrayList<>();
-
-        for ( int i = 0; i <matrices.size()-1; i++) {
-            double[][] matrix1 = matrices.get(i);
-            double[][] matrix2 = matrices.get(i + 1);
-            if (matrix1.length == matrix2.length && matrix1[0].length == matrix2[0].length && 
-                isPowerOfTwo(matrix1.length) && isPowerOfTwo(matrix1[0].length)) {
-                    
-                    
-            
-            } else {
-                throw new IllegalArgumentException("Matrix dimensions don't match or are not powers of 2 for Strassen's multiplication");
-            }
-           
-
-        }
-        return null;
+        
+        
+        
     }
     // Helper method to check if a number is a power of 2
     private static boolean isPowerOfTwo(int n) {
