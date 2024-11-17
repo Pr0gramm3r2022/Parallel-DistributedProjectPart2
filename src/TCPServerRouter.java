@@ -4,7 +4,7 @@ import java.io.*;
 public class TCPServerRouter {
     public static void main(String[] args) throws IOException {
         Socket clientSocket = null; // socket for the thread
-        Object [][] RoutingTable = new Object [10][2]; // routing table
+        Object[][] RoutingTable = new Object[10][2]; // routing table
         int SockNum = 5555; // port number
         boolean Running = true;
         int ind = 0; // index in the routing table
@@ -14,8 +14,7 @@ public class TCPServerRouter {
         try {
             serverSocket = new ServerSocket(5555);
             System.out.println("ServerRouter is Listening on port: 5555.");
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             System.err.println("Could not listen on port: 5555.");
             System.exit(1);
         }
@@ -28,8 +27,7 @@ public class TCPServerRouter {
                 t.start(); // starts the thread
                 ind++; // increments the index
                 System.out.println("ServerRouter connected with Client/Server: " + clientSocket.getInetAddress().getHostAddress());
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 System.err.println("Client/Server failed to connect.");
                 Running = false;
             }

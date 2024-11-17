@@ -21,15 +21,15 @@ public class TCPClient2 {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             System.out.println("Connected to ServerRouter at " + routerIP + ":" + routerPort);
-            
+
             // Communication loop with file input first
             fromFile = new BufferedReader(new FileReader("file.txt"));
             String fileLine, serverResponse;
             while ((fileLine = fromFile.readLine()) != null) {
                 System.out.println("Sent from Client2: " + fileLine);
-                
+
                 out.println(fileLine); // Send message to ServerRouter
-                
+
                 // Read response from server
                 if ((serverResponse = in.readLine()) != null) {
                     System.out.println("Response from Server: " + serverResponse);
@@ -60,7 +60,7 @@ public class TCPClient2 {
                     break;
                 }
             }
-        } catch (UnknownHostException e) { 
+        } catch (UnknownHostException e) {
             System.err.println("Don't know about the ServerRouter: " + routerIP);
         } catch (IOException e) {
             System.err.println("Couldn't connect to ServerRouter: " + e.getMessage());

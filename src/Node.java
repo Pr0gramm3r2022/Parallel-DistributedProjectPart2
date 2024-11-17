@@ -3,8 +3,9 @@ import java.util.List;
 public class Node {
 
     public Node() {
-        
+
     }
+
     public Node(double[][] nodeMatrix) {
         this.nodeMatrix = nodeMatrix;
     }
@@ -16,13 +17,13 @@ public class Node {
             Left.Parent = this;
             Right.Parent = this;
         }
-        
+
     }
 
-    
-// creates a perfect binary tree with bottom nodes storing matrices from list
+
+    // creates a perfect binary tree with bottom nodes storing matrices from list
     public Node(int depth, List<double[][]> nodeMatrixList, BinaryTree tree) {
-        
+
         if (depth > 1) {
             Left = new Node(depth - 1, nodeMatrixList, tree);
             tree.listIndex++;
@@ -37,10 +38,10 @@ public class Node {
             Left.Parent = this;
             Right.Parent = this;
             Left.nodeMatrix = nodeMatrixList.get(tree.listIndex);
-            
+
             tree.listIndex++;
             Right.nodeMatrix = nodeMatrixList.get(tree.listIndex);
-            
+
         }
     }
 
