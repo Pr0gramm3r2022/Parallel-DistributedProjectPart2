@@ -6,8 +6,8 @@ public class TCPServerRouter {
         Socket clientSocket = null; // socket for the thread
         Object[][] RoutingTable = new Object[10][2]; // routing table
         int SockNum = 5555; // port number
-        Boolean Running = true;
-        int ind = 0; // indext in the routing table
+        boolean Running = true;
+        int ind = 0; // index in the routing table
 
         //Accepting connections
         ServerSocket serverSocket = null; // server socket for accepting connections
@@ -20,7 +20,7 @@ public class TCPServerRouter {
         }
 
         // Creating threads with accepted connections
-        while (Running == true) {
+        while (Running) {
             try {
                 clientSocket = serverSocket.accept();
                 SThread t = new SThread(RoutingTable, clientSocket, ind); // creates a thread with a random port
@@ -29,13 +29,14 @@ public class TCPServerRouter {
                 System.out.println("ServerRouter connected with Client/Server: " + clientSocket.getInetAddress().getHostAddress());
             } catch (IOException e) {
                 System.err.println("Client/Server failed to connect.");
-                System.exit(1);
+                Running = false;
             }
         }//end while
 
         //closing connections
-        clientSocket.close();
-        serverSocket.close();
-
+        if (clientSocket != null) {
+            clientSocket.close();
+            serverSocket.close();
+        }
     }
 }
