@@ -37,7 +37,7 @@ public class TCPServer {
 
             // Receive confirmation
             System.out.println("Waiting for router confirmation...");
-            String confirmation = (String)objectIn.readObject();
+            String confirmation = (String) objectIn.readObject();
             System.out.println("Router response: " + confirmation);
 
             boolean running = true;
@@ -78,8 +78,8 @@ public class TCPServer {
                                 System.out.println("Number of threads: " + numThreads);
                                 double efficiency = speedup / numThreads;
 
-                                System.out.println("Speedup: " + speedup + " -- "+(speedup*100)+"%");
-                                System.out.println("Efficiency: " + efficiency + " -- "+(efficiency*100)+"%");
+                                System.out.println("Speedup: " + speedup + " -- " + (speedup * 100) + "%");
+                                System.out.println("Efficiency: " + efficiency + " -- " + (efficiency * 100) + "%");
 
                                 // Send result back to client
                                 objectOut.writeObject(finalMatrix);

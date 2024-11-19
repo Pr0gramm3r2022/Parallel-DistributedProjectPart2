@@ -79,8 +79,7 @@ public class TCPClient {
                 printMatrix(resultData, 100);
 
             } else {
-                System.out.println("Received unexpected result type: " +
-                        (result != null ? result.getClass().getSimpleName() : "null"));
+                System.out.println("Received unexpected result type: " + (result != null ? result.getClass().getSimpleName() : "null"));
             }
 
             // Send goodbye

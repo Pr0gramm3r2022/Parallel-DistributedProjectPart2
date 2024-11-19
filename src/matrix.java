@@ -1,11 +1,9 @@
 public class matrix implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
-
-    // Change to private final to ensure immutability
     private final int[][] matrixData;
 
     public matrix(int[][] data) {
-        // Create a deep copy of the input array to ensure immutability
+        // Create a deep copy of the input array for immutability -- Bug fixing stream issues
         this.matrixData = new int[data.length][data[0].length];
         for (int i = 0; i < data.length; i++) {
             System.arraycopy(data[i], 0, this.matrixData[i], 0, data[i].length);
@@ -13,7 +11,7 @@ public class matrix implements java.io.Serializable {
     }
 
     public int[][] getMatrixData() {
-        // Return a deep copy to maintain encapsulation
+        // Return a deep copy to maintain encapsulation -- Bug fixing stream issues
         int[][] copy = new int[matrixData.length][matrixData[0].length];
         for (int i = 0; i < matrixData.length; i++) {
             System.arraycopy(matrixData[i], 0, copy[i], 0, matrixData[i].length);
