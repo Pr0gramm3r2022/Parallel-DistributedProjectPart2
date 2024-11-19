@@ -1,50 +1,61 @@
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * A utility class for generating n x n matrices filled with random integers.
+ */
 public class MatrixGenerator {
 
-    public static void main(String[] args) {
-        // Define the size of the matrices
-        int numMatrices = 32;
-        int matrixSize = 128;
+    /**
+     * Generates an n x n matrix filled with random integers.
+     *
+     * @param n the size of the matrix (number of rows and columns)
+     * @return a 2D array representing the generated matrix
+     */
+    public static int[][] generateMatrix(int n) {
+        int[][] matrix = new int[n][n];
+        ThreadLocalRandom rand = ThreadLocalRandom.current();
 
-        // Initialize a random number generator
-        Random random = new Random();
-
-        // Create a FileWriter to write to the file
-        try (FileWriter writer = new FileWriter("multiple_matrices.txt")) {
-            // Write the number of matrices at the top
-            writer.write("MATRICES: " + numMatrices + "\n");
-
-            // Loop through the matrices
-            for (int matrixIndex = 0; matrixIndex < numMatrices; matrixIndex++) {
-                // Write the dimensions of the matrix
-                writer.write(matrixSize + " " + matrixSize + "\n");
-
-                // Generate and write the matrix
-                for (int row = 0; row < matrixSize; row++) {
-                    // Generate a row of random floating-point numbers
-                    for (int col = 0; col < matrixSize; col++) {
-                        // Generate a random float between -10 and 10
-                        double value = -10 + (10 - (-10)) * random.nextDouble();
-                        // Write the value to the file with 6 decimal places
-                        writer.write(String.format("%.6f", value));
-                        if (col < matrixSize - 1) {
-                            writer.write(" ");  // Space between values
-                        }
-                    }
-                    writer.write("\n");
-                }
-
-                // Write the separator
-                writer.write("---\n");
+        for (int i = 0; i < n; i++) {
+            int[] row = matrix[i];
+            for (int j = 0; j < n; j++) {
+                row[j] = rand.nextInt();
             }
+        }
+        return matrix;
+    }
 
-            System.out.println("Text file 'matrices.txt' has been generated.");
-        } catch (IOException e) {
-            System.err.println("An error occurred while writing to the file.");
-            e.printStackTrace();
+    /**
+     * Generates an n x n matrix filled with random integers within a specified range.
+     *
+     * @param n        the size of the matrix (number of rows and columns)
+     * @param minValue the inclusive lower bound for random numbers
+     * @param maxValue the exclusive upper bound for random numbers
+     * @return a 2D array representing the generated matrix
+     */
+    public static int[][] generateMatrix(int n, int minValue, int maxValue) {
+        int[][] matrix = new int[n][n];
+        ThreadLocalRandom rand = ThreadLocalRandom.current();
+
+        for (int i = 0; i < n; i++) {
+            int[] row = matrix[i];
+            for (int j = 0; j < n; j++) {
+                row[j] = rand.nextInt(minValue, maxValue);
+            }
+        }
+        return matrix;
+    }
+
+    // Optional main method for testing
+    public static void main(String[] args) {
+        int n = 5;
+        int[][] matrix = generateMatrix(n);
+
+        // Print the generated matrix
+        for (int[] row : matrix) {
+            for (int value : row) {
+                System.out.printf("%3d ", value);
+            }
+            System.out.println();
         }
     }
 }
