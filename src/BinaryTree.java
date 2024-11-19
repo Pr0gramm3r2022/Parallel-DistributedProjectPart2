@@ -11,7 +11,7 @@ public class BinaryTree {
     public int listIndex = 0;
 
 
-    public BinaryTree(List<double[][]> nodeMatrixList) {
+    public BinaryTree(List<int[][]> nodeMatrixList) {
         root = new Node();
 
 

@@ -6,7 +6,7 @@ public class Node implements Runnable {
 
     }
 
-    public Node(double[][] nodeMatrix) {
+    public Node(int[][] nodeMatrix) {
         this.nodeMatrix = nodeMatrix;
     }
 
@@ -24,7 +24,7 @@ public class Node implements Runnable {
     public Thread nodeThread;
 
     // creates a perfect binary tree with bottom nodes storing matrices from list
-    public Node(int depth, List<double[][]> nodeMatrixList, BinaryTree tree) {
+    public Node(int depth, List<int[][]> nodeMatrixList, BinaryTree tree) {
 
         nodeThread = new Thread(this);
         if (depth > 1) {
@@ -69,7 +69,7 @@ public class Node implements Runnable {
 
     }
 
-    public double[][] nodeMatrix;
+    public int[][] nodeMatrix;
     public Node Left;
     public Node Right;
     public Node Parent;

@@ -4,28 +4,13 @@ import java.util.*;
 
 public class TCPClient {
     public static void main(String[] args) throws IOException {
-        String routerIP = "129.80.181.47"; // IP of ServerRouter
+        String routerIP = "localhost"; // IP of ServerRouter
         int routerPort = 5555; // Port ServerRouter listens on
         String localAddress = InetAddress.getLocalHost().getHostAddress();
         Socket socket = null; // Socket to connect to ServerRouter
         PrintWriter out = null; // For sending to ServerRouter
         BufferedReader in = null; // For receiving from ServerRouter
-        boolean running = true; // Loop flag
-
-        // Get user input for matrix size and number of matrices
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Size of Matrices: ");
-        int matrixSize = scanner.nextInt();
-        System.out.print("Number of Matrices: ");
-        int numMatrices = scanner.nextInt();
-
-        // Generate matrices
-        matrix[] matrices = new matrix[numMatrices];
-        for (int i = 0; i < numMatrices; i++) {
-            int[][] newMatrix = MatrixGenerator.generateMatrix(matrixSize);
-
-            matrices[i] = new matrix(newMatrix);
-        }
+        boolean running; // Loop flag
 
         try {
             // Get local IP
@@ -38,11 +23,34 @@ public class TCPClient {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            System.out.println("Connected to ServerRouter at " + routerIP + ":" + routerPort);
+            if (socket.isConnected()) {
+                running = true;
+                System.out.println("Connected to ServerRouter at " + routerIP + ":" + routerPort);
+            } else {
+                throw new IOException("Failed to connect to ServerRouter.");
+            }
+
+            // Get user input for matrix size and number of matrices
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Size of Matrices: ");
+            int matrixSize = scanner.nextInt();
+            System.out.print("Number of Matrices: ");
+            int numMatrices = scanner.nextInt();
+
+            // Generate matrices
+            matrix[] matrices = new matrix[numMatrices];
+            for (int i = 0; i < numMatrices; i++) {
+                int[][] newMatrix = MatrixGenerator.generateMatrix(matrixSize);
+
+                matrices[i] = new matrix(newMatrix);
+            }
 
             // Communication loop
             String serverResponse;
             while (running) {
+                // Send start of matrix transmission
+                objectOut.writeObject("Start");
+
                 // Send matrices to ServerRouter
                 objectOut.writeObject(matrices);
 

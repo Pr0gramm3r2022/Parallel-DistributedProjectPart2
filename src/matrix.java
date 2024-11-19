@@ -6,4 +6,9 @@ public class matrix {
     public matrix(int[][] matrixData) {
         this.matrixData = matrixData;
     }
+
+    // Getter
+    public int[][] getMatrixData() {
+        return matrixData;
+    }
 }
