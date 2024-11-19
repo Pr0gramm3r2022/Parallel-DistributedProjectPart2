@@ -1,65 +1,89 @@
 import java.io.*;
 import java.net.*;
-
+import java.util.Hashtable;
 
 public class SThread extends Thread {
-	private Object[][] RTable; // routing table
-	private PrintWriter out, outTo; // writers (for writing back to the machine and to destination)
-	private BufferedReader in; // reader (for reading from the machine connected to)
-	private String inputLine, outputLine, destination, addr; // communication strings
-	private Socket outSocket; // socket for communicating with a destination
-	private int ind; // indext in the routing table
+    private Hashtable<String, Socket> routingTable; // The routing table
+    private ObjectOutputStream outToClient, outToServer; // For sending objects to client and server
+    private ObjectInputStream inFromClient, inFromServer; // For receiving objects from client and server
+    private Socket clientSocket, serverSocket; // Sockets for client and server
+    private String clientKey; // Key to store Socket in routing table
 
-	// Constructor
-	SThread(Object[][] Table, Socket toClient, int index) throws IOException {
-		out = new PrintWriter(toClient.getOutputStream(), true);
-		in = new BufferedReader(new InputStreamReader(toClient.getInputStream()));
-		RTable = Table;
-		addr = toClient.getInetAddress().getHostAddress();
-		RTable[index][0] = addr; // IP addresses
-		RTable[index][1] = toClient; // sockets for communication
-		ind = index;
-	}
+    public SThread(Hashtable<String, Socket> routingTable, Socket clientSocket) {
+        this.routingTable = routingTable;
+        this.clientSocket = clientSocket;
+        this.clientKey = clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort();
 
-	// Run method (will run for each machine that connects to the ServerRouter)
-	public void run() {
-		try {
-			// Initial sends/receives
-			destination = in.readLine(); // initial read (the destination for writing)
-			System.out.println("Forwarding to " + destination);
-			out.println("Connected to the router."); // confirmation of connection
+        try {
+            this.inFromClient = new ObjectInputStream(this.clientSocket.getInputStream());
+            this.outToClient = new ObjectOutputStream(this.clientSocket.getOutputStream());
+        } catch (IOException e) {
+            System.err.println("Error setting up streams: " + e.getMessage());
+        }
+    }
 
-			// waits 10 seconds to let the routing table fill with all machines' information
-			try {
-				sleep(10000);
-			} catch (InterruptedException ie) {
-				System.out.println("Thread interrupted");
-			}
+    public void run() {
+        // Store client connection to routing table
+        routingTable.put(clientKey, clientSocket);
 
-			// loops through the routing table to find the destination
-			for (int i = 0; i < 10; i++) {
-				if (destination.equals((String) RTable[i][0])) {
-					outSocket = (Socket) RTable[i][1]; // gets the socket for communication from the table
-					System.out.println("Found destination: " + destination);
-					outTo = new PrintWriter(outSocket.getOutputStream(), true); // assigns a writer
-				}
-			}
+        // Wait until the TCPServer connection is available in the routing table
+        while (serverSocket == null) {
+            serverSocket = routingTable.get("server"); // Check if server exists
+            if (serverSocket == null) {
+                try {
+                    Thread.sleep(1000); // Sleep for 1 second between checks
+                } catch (InterruptedException e) {
+                    System.err.println("Thread sleep interrupted: " + e.getMessage());
+                }
+            }
+        }
 
-			// Communication loop
-			while ((inputLine = in.readLine()) != null) {
-				System.out.println("Client/Server said: " + inputLine);
-				if (inputLine.equals("Bye.")) // exit statement
-					break;
-				outputLine = inputLine; // passes the input from the machine to the output string for the destination
+        // Set up streams to and from server
+        try {
+            outToServer = new ObjectOutputStream(serverSocket.getOutputStream());
+            inFromServer = new ObjectInputStream(serverSocket.getInputStream());
+        } catch (IOException e) {
+            System.err.println("Error setting up streams: " + e.getMessage());
+        }
 
-				if (outSocket != null) {
-					outTo.println(outputLine); // writes to the destination
-				}
-			}// end while
-		}// end try
-		catch (IOException e) {
-			System.err.println("Could not listen to socket.");
-			System.exit(1);
-		}
-	}
+        // Communication loop
+        try {
+            Object inputObject;
+            while ((inputObject = inFromClient.readObject()) != null) {
+                System.out.println("Received from Client: " + inputObject);
+
+                // Forward client message to the server
+                outToServer.writeObject(inputObject);
+                outToServer.flush();
+
+                // Read response from server
+                Object response = inFromServer.readObject();
+                System.out.println("Received from Server: " + response);
+
+                // Send response back to client
+                outToClient.writeObject(response);
+                outToClient.flush();
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error in SThread communication loop: " + e.getMessage());
+        } finally {
+            // Clean up and remove disconnected client from routing table
+            routingTable.remove(clientKey);
+
+            System.out.println(
+                    "SThread '" + Thread.currentThread().getId() + "' shutting down. Cleaning up connections.");
+
+            // Close client connections
+            try {
+                if (inFromClient != null)
+                    inFromClient.close();
+                if (outToClient != null)
+                    outToClient.close();
+                if (clientSocket != null)
+                    clientSocket.close();
+            } catch (IOException e) {
+                System.err.println("Error closing sockets or streams: " + e.getMessage());
+            }
+        }
+    }
 }
