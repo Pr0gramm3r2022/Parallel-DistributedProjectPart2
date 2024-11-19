@@ -1,65 +1,128 @@
 import java.io.*;
 import java.net.*;
 
-
 public class SThread extends Thread {
-	private Object[][] RTable; // routing table
-	private PrintWriter out, outTo; // writers (for writing back to the machine and to destination)
-	private BufferedReader in; // reader (for reading from the machine connected to)
-	private String inputLine, outputLine, destination, addr; // communication strings
-	private Socket outSocket; // socket for communicating with a destination
-	private int ind; // indext in the routing table
+	private Object[][] RTable;
+	private String addr;
+	private Socket outSocket;
+	private int ind;
+	private ObjectOutputStream objectOut;
+	private ObjectInputStream objectIn;
+	private ObjectOutputStream destObjectOut;
+	private ObjectInputStream destObjectIn;
+	private boolean isServer = false;
+	private Socket clientSocket;
 
-	// Constructor
 	SThread(Object[][] Table, Socket toClient, int index) throws IOException {
-		out = new PrintWriter(toClient.getOutputStream(), true);
-		in = new BufferedReader(new InputStreamReader(toClient.getInputStream()));
 		RTable = Table;
+		clientSocket = toClient;
 		addr = toClient.getInetAddress().getHostAddress();
-		RTable[index][0] = addr; // IP addresses
-		RTable[index][1] = toClient; // sockets for communication
 		ind = index;
+
+		// Store in routing table
+		RTable[index][0] = addr;
+		RTable[index][1] = toClient;
 	}
 
-	// Run method (will run for each machine that connects to the ServerRouter)
 	public void run() {
 		try {
-			// Initial sends/receives
-			destination = in.readLine(); // initial read (the destination for writing)
-			System.out.println("Forwarding to " + destination);
-			out.println("Connected to the router."); // confirmation of connection
+			// Initialize streams for incoming connection - IMPORTANT: Output before Input
+			objectOut = new ObjectOutputStream(clientSocket.getOutputStream());
+			objectOut.flush();
+			objectIn = new ObjectInputStream(clientSocket.getInputStream());
 
-			// waits 10 seconds to let the routing table fill with all machines' information
-			try {
-				sleep(10000);
-			} catch (InterruptedException ie) {
-				System.out.println("Thread interrupted");
+			// Read initial identification
+			Object initialMessage = objectIn.readObject();
+			if (initialMessage == null) {
+				System.err.println("Error: Received null initial message");
+				return;
 			}
 
-			// loops through the routing table to find the destination
-			for (int i = 0; i < 10; i++) {
-				if (destination.equals((String) RTable[i][0])) {
-					outSocket = (Socket) RTable[i][1]; // gets the socket for communication from the table
-					System.out.println("Found destination: " + destination);
-					outTo = new PrintWriter(outSocket.getOutputStream(), true); // assigns a writer
+			if (initialMessage instanceof String) {
+				String msg = (String)initialMessage;
+				if ("SERVER".equals(msg)) {
+					isServer = true;
+					System.out.println("Server connected at index: " + ind);
+				} else {
+					System.out.println("Client requesting server at: " + msg);
 				}
 			}
 
-			// Communication loop
-			while ((inputLine = in.readLine()) != null) {
-				System.out.println("Client/Server said: " + inputLine);
-				if (inputLine.equals("Bye.")) // exit statement
+			// Send confirmation
+			objectOut.writeObject("Connected to the router.");
+			objectOut.flush();
+
+			// If this is a client connection, find the server
+			if (!isServer) {
+				System.out.println("Looking for server connection...");
+				sleep(1000);
+
+				for (int i = 0; i < RTable.length; i++) {
+					if (RTable[i][1] != null && i != ind) {
+						Socket potentialServer = (Socket) RTable[i][1];
+						if (potentialServer.isConnected() && !potentialServer.isClosed()) {
+							outSocket = potentialServer;
+							System.out.println("Found server at index: " + i);
+							break;
+						}
+					}
+				}
+
+				if (outSocket == null) {
+					System.err.println("No server found in routing table");
+					return;
+				}
+
+				// Initialize server connection streams - IMPORTANT: Output before Input
+				destObjectOut = new ObjectOutputStream(outSocket.getOutputStream());
+				destObjectOut.flush();
+				destObjectIn = new ObjectInputStream(outSocket.getInputStream());
+				System.out.println("Server connection streams initialized");
+			}
+
+			// Message forwarding loop
+			while (!clientSocket.isClosed()) {
+				try {
+					Object message = objectIn.readObject();
+					System.out.println("Received: " + message.getClass().getSimpleName());
+
+					if (!isServer && destObjectOut != null) {
+						// Forward to server
+						destObjectOut.writeObject(message);
+						destObjectOut.flush();
+
+						// If it's matrices, wait for response
+						if (message instanceof matrix[]) {
+							Object response = destObjectIn.readObject();
+							objectOut.writeObject(response);
+							objectOut.flush();
+						}
+					}
+
+					if (message instanceof String && "Bye.".equals(message)) {
+						break;
+					}
+				} catch (EOFException e) {
+					System.out.println("Connection ended by peer");
 					break;
-				outputLine = inputLine; // passes the input from the machine to the output string for the destination
-
-				if (outSocket != null) {
-					outTo.println(outputLine); // writes to the destination
+				} catch (SocketException e) {
+					System.out.println("Socket connection terminated");
+					break;
 				}
-			}// end while
-		}// end try
-		catch (IOException e) {
-			System.err.println("Could not listen to socket.");
-			System.exit(1);
+			}
+		} catch (Exception e) {
+			System.err.println("Error in routing thread: " + e.getMessage());
+			e.printStackTrace();
+		} finally {
+			try {
+				if (objectOut != null) objectOut.close();
+				if (objectIn != null) objectIn.close();
+				if (destObjectOut != null) destObjectOut.close();
+				if (destObjectIn != null) destObjectIn.close();
+				if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+			} catch (IOException e) {
+				System.err.println("Error closing resources: " + e.getMessage());
+			}
 		}
 	}
 }

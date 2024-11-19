@@ -3,64 +3,73 @@ import java.net.*;
 
 public class TCPServer {
     public static void main(String[] args) {
-        String routerIP = "localhost"; // IP address of ServerRouter
-        int routerPort = 5555; // Port number ServerRouter listens on
-        Socket routerSocket = null; // Socket to connect with ServerRouter
-        ObjectOutputStream out = null; // For sending objects to ServerRouter
-        ObjectInputStream in = null; // For receiving objects from ServerRouter
-        boolean running = true; // Loop flag
-        boolean matrixTransmission = false; // Flag for matrix transmission
-        matrix[] matrices = null; // Array of matrices to be received from ServerRouter
-        int[][] resultMatrix = null; // Result of matrix multiplication
-
+        String routerIP = "localhost";
+        int routerPort = 5555;
+        Socket routerSocket = null;
+        ObjectOutputStream objectOut = null;
+        ObjectInputStream objectIn = null;
 
         try {
+            String serverAddress = InetAddress.getLocalHost().getHostAddress();
+            System.out.println("Server IP: " + serverAddress);
+
+            // Connect to the local router
             routerSocket = new Socket(routerIP, routerPort);
-            out = new ObjectOutputStream(routerSocket.getOutputStream());
-            in = new ObjectInputStream(routerSocket.getInputStream());
-            System.out.println("Server connected to ServerRouter");
 
-            // Communication loop with ServerRouter
-            Object fromClient;
+            // Create object streams first - IMPORTANT: Output must be created before Input
+            objectOut = new ObjectOutputStream(routerSocket.getOutputStream());
+            objectOut.flush();
+            objectIn = new ObjectInputStream(routerSocket.getInputStream());
+
+            // Send identification
+            objectOut.writeObject("SERVER");
+            objectOut.flush();
+
+            // Receive confirmation
+            String confirmation = (String)objectIn.readObject();
+            System.out.println("Router response: " + confirmation);
+
+            boolean running = true;
             while (running) {
-                // Check for start of matrix transmission
-                fromClient = in.readObject();
-                // Process data received from client
-                String response = fromClient.toString().toUpperCase(); // Convert to uppercase
-                System.out.println("Received from ServerRouter: " + fromClient);
-                if (response.equals("START")) {
-                    matrixTransmission = true;
-                }
-                if (matrixTransmission) {
-                    if (fromClient instanceof matrix[]) {
-                        matrices = (matrix[]) fromClient;
-                        // Perform matrix multiplication
-                        resultMatrix = MatrixFileIO.resultMatrix(matrices);
-                        // Send response back to ServerRouter
-                        out.writeObject(matrices);
-                        out.flush();
+                try {
+                    Object incoming = objectIn.readObject();
+                    System.out.println("Received: " + (incoming != null ? incoming.getClass().getSimpleName() : "null"));
+
+                    if (incoming instanceof String) {
+                        String command = (String) incoming;
+                        if ("Start".equals(command)) {
+                            // Expect matrices next
+                            Object matricesObj = objectIn.readObject();
+                            if (matricesObj instanceof matrix[]) {
+                                matrix[] matrices = (matrix[]) matricesObj;
+                                System.out.println("Processing " + matrices.length + " matrices...");
+
+                                // Process matrices
+                                int[][] result = MatrixFileIO.resultMatrix(matrices);
+                                matrix[] resultArray = new matrix[]{new matrix(result)};
+
+                                // Send result back
+                                objectOut.writeObject(resultArray);
+                                objectOut.flush();
+                                System.out.println("Sent result back to client");
+                            }
+                        } else if ("Bye.".equals(command)) {
+                            running = false;
+                        }
                     }
-                }
-
-                // Send the response back to ServerRouter
-                System.out.println("Sent from Server: " + response);
-                out.writeObject(response);
-                out.flush();
-
-                // Check for termination
-                if (response.equals("BYE.")) {
-                    running = false;
+                } catch (EOFException | SocketException e) {
+                    System.out.println("Client disconnected");
+                    break;
                 }
             }
-        } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error connecting to ServerRouter: " + e.getMessage());
-        } finally {
-            // Close connections
-            System.out.println("TCPServer shutting down. Cleaning up connections.");
 
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
             try {
-                if (out != null) out.close();
-                if (in != null) in.close();
+                if (objectOut != null) objectOut.close();
+                if (objectIn != null) objectIn.close();
                 if (routerSocket != null) routerSocket.close();
             } catch (IOException e) {
                 System.err.println("Error closing resources: " + e.getMessage());
