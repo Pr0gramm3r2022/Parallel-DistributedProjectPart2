@@ -303,8 +303,12 @@ public class MatrixFileIO {
             BinaryTree tree = new BinaryTree(readMatrices);
             tree.treeMultiplication();
             System.out.println("Result of Strassen's multiplication:");
-            printMatrix(tree.root.nodeMatrix);
+           // printMatrix(tree.root.nodeMatrix);
 
+            tree = new BinaryTree(readMatrices);
+            tree.treeMultiplicationMultithreaded();
+            System.out.println("Result of Strassen's multiplication with multithreading:");
+           // printMatrix(tree.root.nodeMatrix);
 
 
             

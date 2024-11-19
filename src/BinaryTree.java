@@ -40,6 +40,7 @@ public class BinaryTree {
 
     public void treeMultiplication(){
         currentNode = root;
+        long startTime = System.nanoTime();
         while(root.nodeMatrix==null){
            
             if(currentNode.Left.nodeMatrix==null){
@@ -57,8 +58,27 @@ public class BinaryTree {
                 currentNode = currentNode.Parent;
             }
         }
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println("Time taken for Strassen Multiplication without Multithreading: " + duration + " nanoseconds");
     }
 
+    
+
+    public void treeMultiplicationMultithreaded(){
+        currentNode = root;
+        long startTime = System.nanoTime();
+        currentNode.nodeThread.start();
+        try{
+            currentNode.nodeThread.join();
+        }
+        catch(InterruptedException e){
+            System.out.println("Thread interrupted");
+        }
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println("Time taken for Strassen Multiplication with Multithreading: " + duration + " nanoseconds");
+    }
 
 }
 
