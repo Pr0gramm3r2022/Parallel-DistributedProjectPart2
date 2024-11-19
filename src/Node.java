@@ -3,8 +3,9 @@ import java.util.List;
 public class Node implements Runnable {
 
     public Node() {
-        
+
     }
+
     public Node(double[][] nodeMatrix) {
         this.nodeMatrix = nodeMatrix;
     }
@@ -16,16 +17,15 @@ public class Node implements Runnable {
             Left.Parent = this;
             Right.Parent = this;
         }
-        
+
     }
 
-    
 
     public Thread nodeThread;
 
-// creates a perfect binary tree with bottom nodes storing matrices from list
+    // creates a perfect binary tree with bottom nodes storing matrices from list
     public Node(int depth, List<double[][]> nodeMatrixList, BinaryTree tree) {
-        
+
         nodeThread = new Thread(this);
         if (depth > 1) {
             Left = new Node(depth - 1, nodeMatrixList, tree);
@@ -50,25 +50,22 @@ public class Node implements Runnable {
 
     public boolean noOptions = false;
 
-    public void run(){
-       if(Left.Left != null){
-        Left.nodeThread.start();
-        Right.nodeThread.start();
-        try{
-            Left.nodeThread.join();
-            Right.nodeThread.join();
-        }
-        catch(InterruptedException e){
-            System.out.println("Thread interrupted");
+    public void run() {
+        if (Left.Left != null) {
+            Left.nodeThread.start();
+            Right.nodeThread.start();
+            try {
+                Left.nodeThread.join();
+                Right.nodeThread.join();
+            } catch (InterruptedException e) {
+                System.out.println("Thread interrupted");
+            }
+
+            nodeMatrix = MatrixFileIO.StrassenMultiplication(Left.nodeMatrix, Right.nodeMatrix);
+        } else {
+            nodeMatrix = MatrixFileIO.StrassenMultiplication(Left.nodeMatrix, Right.nodeMatrix);
         }
 
-        nodeMatrix = MatrixFileIO.StrassenMultiplication(Left.nodeMatrix, Right.nodeMatrix);
-       }
-       
-         else{
-              nodeMatrix = MatrixFileIO.StrassenMultiplication(Left.nodeMatrix, Right.nodeMatrix);
-         }
-         
 
     }
 

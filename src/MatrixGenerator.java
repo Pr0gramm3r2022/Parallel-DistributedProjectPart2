@@ -8,7 +8,7 @@ public class MatrixGenerator {
         // Define the size of the matrices
         int numMatrices = 32;
         int matrixSize = 128;
-        
+
         // Initialize a random number generator
         Random random = new Random();
 

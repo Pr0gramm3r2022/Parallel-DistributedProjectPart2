@@ -6,7 +6,6 @@ public class MatrixFileIO {
     private static final String MATRIX_SEPARATOR = "---";
 
 
-
     public MatrixFileIO() {
     }
 
@@ -112,27 +111,27 @@ public class MatrixFileIO {
 
     // Add two matrices
     public static double[][] addMatrices(double[][] matrix1, double[][] matrix2) {
-       
+
 
         // Check matrix dimensions
-        
-            
-            if (matrix1.length != matrix2.length || matrix1[0].length != matrix2[0].length) {
-                throw new IllegalArgumentException("Matrix dimensions don't match for addition");
-            }
-        
+
+
+        if (matrix1.length != matrix2.length || matrix1[0].length != matrix2[0].length) {
+            throw new IllegalArgumentException("Matrix dimensions don't match for addition");
+        }
+
         // Add matrices
-        
-          
-            int rows = matrix1.length;
-            int cols = matrix1[0].length;
-            double[][] sum = new double[rows][cols];
-            for (int j = 0; j < rows; j++) {
-                for (int k = 0; k < cols; k++) {
-                    sum[j][k] = matrix1[j][k] + matrix2[j][k];
-                }
-            
-            
+
+
+        int rows = matrix1.length;
+        int cols = matrix1[0].length;
+        double[][] sum = new double[rows][cols];
+        for (int j = 0; j < rows; j++) {
+            for (int k = 0; k < cols; k++) {
+                sum[j][k] = matrix1[j][k] + matrix2[j][k];
+            }
+
+
         }
 
         return sum;
@@ -158,14 +157,13 @@ public class MatrixFileIO {
 
         return difference;
     }
-    
 
 
     public static double[][] StrassenMultiplication(double[][] matrix1, double[][] matrix2) {
-        
+
         //calculates matrix if all variables needed are just numbers
 
-        if(matrix1.length == 2){
+        if (matrix1.length == 2) {
             double[][] result = new double[2][2];
             double m1;
             double m2;
@@ -174,14 +172,14 @@ public class MatrixFileIO {
             double m5;
             double m6;
             double m7;
-            
+
             m1 = (matrix1[0][0] + matrix1[1][0]) * (matrix2[0][0] + matrix2[0][1]);
             m2 = (matrix1[0][1] + matrix1[1][1]) * (matrix2[1][0] + matrix2[1][1]);
             m3 = (matrix1[0][0] - matrix1[1][1]) * (matrix2[0][0] + matrix2[1][1]);
             m4 = matrix1[0][0] * (matrix2[0][1] - matrix2[1][1]);
             m5 = (matrix1[1][0] + matrix1[1][1]) * matrix2[0][0];
             m6 = (matrix1[0][0] + matrix1[0][1]) * matrix2[1][1];
-            m7 = matrix1[1][1] * (matrix2[1][0]-matrix2[0][0]);
+            m7 = matrix1[1][1] * (matrix2[1][0] - matrix2[0][0]);
             result[0][0] = m2 + m3 - m6 - m7;
             result[0][1] = m4 + m6;
             result[1][0] = m5 + m7;
@@ -189,10 +187,10 @@ public class MatrixFileIO {
             return result;
         }
 
-        
+
         //calculates matrix if variables are submatrices(if matrix is larger than 2x2)
-        else{
-            int matrixSize = matrix1.length/2;
+        else {
+            int matrixSize = matrix1.length / 2;
             double[][] matrix1A = new double[matrixSize][matrixSize];
             double[][] matrix1B = new double[matrixSize][matrixSize];
             double[][] matrix1C = new double[matrixSize][matrixSize];
@@ -201,7 +199,7 @@ public class MatrixFileIO {
             double[][] matrix2F = new double[matrixSize][matrixSize];
             double[][] matrix2G = new double[matrixSize][matrixSize];
             double[][] matrix2H = new double[matrixSize][matrixSize];
-            
+
             double[][] m1;
             double[][] m2;
             double[][] m3;
@@ -224,7 +222,7 @@ public class MatrixFileIO {
                     matrix2H[i][j] = matrix2[i + matrix2.length / 2][j + matrix2[0].length / 2];
                 }
             }
-            
+
             m1 = StrassenMultiplication(addMatrices(matrix1A, matrix1C), addMatrices(matrix2E, matrix2F));
             m2 = StrassenMultiplication(addMatrices(matrix1B, matrix1D), addMatrices(matrix2G, matrix2H));
             m3 = StrassenMultiplication(subtractMatrices(matrix1A, matrix1D), addMatrices(matrix2E, matrix2H));
@@ -232,7 +230,7 @@ public class MatrixFileIO {
             m5 = StrassenMultiplication(addMatrices(matrix1C, matrix1D), matrix2E);
             m6 = StrassenMultiplication(addMatrices(matrix1A, matrix1B), matrix2H);
             m7 = StrassenMultiplication(matrix1D, subtractMatrices(matrix2G, matrix2E));
-            
+
             double[][] result = new double[matrix1.length][matrix1[0].length];
             for (int i = 0; i < matrixSize; i++) {
                 for (int j = 0; j < matrixSize; j++) {
@@ -246,34 +244,19 @@ public class MatrixFileIO {
         }
 
 
-
-
-        
-
-        
     }
-    
 
-    
+
     // Strassen's matrix multiplication
 
-    
 
-    
     // Helper method to check if a number is a power of 2
     private static boolean isPowerOfTwo(int n) {
         return (n & (n - 1)) == 0 && n > 0;
     }
 
 
-        
-
-
-
     // Example usage
-        
-        
-       
 
 
     // Example usage
@@ -291,7 +274,6 @@ public class MatrixFileIO {
             }
 
 
-
             // Print read matrices
             System.out.println("\n\nRead " + readMatrices.size() + " matrices from file:");
             for (int i = 0; i < readMatrices.size(); i++) {
@@ -303,21 +285,19 @@ public class MatrixFileIO {
             BinaryTree tree = new BinaryTree(readMatrices);
             tree.treeMultiplication();
             System.out.println("Result of Strassen's multiplication:");
-           // printMatrix(tree.root.nodeMatrix);
+            // printMatrix(tree.root.nodeMatrix);
 
             tree = new BinaryTree(readMatrices);
             tree.treeMultiplicationMultithreaded();
             System.out.println("Result of Strassen's multiplication with multithreading:");
-           // printMatrix(tree.root.nodeMatrix);
+            // printMatrix(tree.root.nodeMatrix);
 
 
-            
         } catch (IOException e) {
             System.err.println("Error handling matrix file: " + e.getMessage());
             e.printStackTrace();
         }
 
 
-        
     }
 }
