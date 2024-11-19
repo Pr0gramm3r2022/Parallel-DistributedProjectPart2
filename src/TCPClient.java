@@ -4,7 +4,7 @@ import java.util.*;
 
 public class TCPClient {
     public static void main(String[] args) {
-        String routerIP = "192.168.50.119";
+        String routerIP = "localhost";
         int routerPort = 5555;
         Socket socket = null;
         ObjectOutputStream objectOut = null;

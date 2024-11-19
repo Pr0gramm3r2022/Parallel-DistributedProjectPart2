@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.ExecutionException;
 
 public class TCPServer {
     public static void main(String[] args) {
@@ -51,23 +52,38 @@ public class TCPServer {
                         System.out.println("Received command: " + command);
 
                         if ("Start".equals(command)) {
-                            System.out.println("Received Start command, waiting for matrices...");
                             Object matricesObj = objectIn.readObject();
-                            System.out.println("Received matrices object of type: " +
-                                    (matricesObj != null ? matricesObj.getClass().getSimpleName() : "null"));
 
                             if (matricesObj instanceof matrix[]) {
                                 matrix[] matrices = (matrix[]) matricesObj;
-                                System.out.println("Processing " + matrices.length + " matrices...");
+
+                                // Measure start time
+                                long startTime = System.nanoTime();
 
                                 // Process matrices
                                 int[][] result = MatrixFileIO.resultMatrix(matrices);
                                 matrix finalMatrix = new matrix(result);
 
-                                System.out.println("Sending result back to client...");
+                                // Measure end time
+                                long endTime = System.nanoTime();
+                                long duration = endTime - startTime;
+                                MatrixFileIO.shutdown();
+                                System.out.println("Matrix multiplication time: \t" + duration + " nanoseconds\n\tIn Seconds: " + duration / 1e9);
+
+                                // Compute speedup and efficiency
+                                long baselineTime = getBaselineTime(matrices);
+                                System.out.println("Baseline time: \t" + baselineTime + " nanoseconds\n\tIn Seconds: " + baselineTime / 1e9);
+                                double speedup = (double) baselineTime / duration;
+                                int numThreads = Runtime.getRuntime().availableProcessors();
+                                System.out.println("Number of threads: " + numThreads);
+                                double efficiency = speedup / numThreads;
+
+                                System.out.println("Speedup: " + speedup + " -- "+(speedup*100)+"%");
+                                System.out.println("Efficiency: " + efficiency + " -- "+(efficiency*100)+"%");
+
+                                // Send result back to client
                                 objectOut.writeObject(finalMatrix);
                                 objectOut.flush();
-                                System.out.println("Result sent");
                             }
                         } else if ("Bye.".equals(command)) {
                             System.out.println("Received Bye command, ending session");
@@ -110,5 +126,13 @@ public class TCPServer {
                 System.err.println("Error closing resources: " + e.getMessage());
             }
         }
+    }
+
+    private static long getBaselineTime(matrix[] matrices) throws ExecutionException, InterruptedException {
+        long startTime = System.nanoTime();
+        int[][] result = MatrixFileIO.resultMatrixSingleThread(matrices); // Assume this is single-threaded
+        long endTime = System.nanoTime();
+        MatrixFileIO.shutdown();
+        return endTime - startTime;
     }
 }
