@@ -4,7 +4,7 @@ import java.io.*;
 public class TCPServerRouter {
     public static void main(String[] args) throws IOException {
         Socket clientSocket = null;
-        Object[][] RoutingTable = new Object[10][2];
+        Object[][] RoutingTable = new Object[10][2]; // Now stores [address, SThread] pairs
         int SockNum = 5555;
         boolean Running = true;
         int ind = 0;
@@ -40,8 +40,8 @@ public class TCPServerRouter {
             }
         }
 
-        if (clientSocket != null) {
-            clientSocket.close();
+        // Cleanup
+        if (serverSocket != null && !serverSocket.isClosed()) {
             serverSocket.close();
         }
     }

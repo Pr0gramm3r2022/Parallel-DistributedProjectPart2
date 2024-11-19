@@ -4,14 +4,14 @@ import java.net.*;
 public class SThread extends Thread {
 	private Object[][] RTable;
 	private String addr;
-	private Socket outSocket;
+	private Socket clientSocket;
 	private int ind;
 	private ObjectOutputStream objectOut;
 	private ObjectInputStream objectIn;
-	private ObjectOutputStream destObjectOut;
-	private ObjectInputStream destObjectIn;
+	private SThread serverThread;
+	private SThread clientThread;
 	private boolean isServer = false;
-	private Socket clientSocket;
+	private volatile boolean running = true;
 
 	SThread(Object[][] Table, Socket toClient, int index) throws IOException {
 		RTable = Table;
@@ -19,110 +19,153 @@ public class SThread extends Thread {
 		addr = toClient.getInetAddress().getHostAddress();
 		ind = index;
 
-		// Store in routing table
 		RTable[index][0] = addr;
-		RTable[index][1] = toClient;
+		RTable[index][1] = this;
+
+		objectOut = new ObjectOutputStream(clientSocket.getOutputStream());
+		objectOut.flush();
+		objectIn = new ObjectInputStream(clientSocket.getInputStream());
 	}
 
 	public void run() {
 		try {
-			// Initialize streams for incoming connection - IMPORTANT: Output before Input
-			objectOut = new ObjectOutputStream(clientSocket.getOutputStream());
-			objectOut.flush();
-			objectIn = new ObjectInputStream(clientSocket.getInputStream());
+			System.out.println("[Thread-" + ind + "] Handling connection for: " + addr);
 
-			// Read initial identification
+			// Handle initial connection
 			Object initialMessage = objectIn.readObject();
-			if (initialMessage == null) {
-				System.err.println("Error: Received null initial message");
-				return;
-			}
+			System.out.println("[Thread-" + ind + "] Received initial message: " + initialMessage);
 
 			if (initialMessage instanceof String) {
 				String msg = (String)initialMessage;
 				if ("SERVER".equals(msg)) {
 					isServer = true;
-					System.out.println("Server connected at index: " + ind);
+					System.out.println("[Thread-" + ind + "] Server connected");
 				} else {
-					System.out.println("Client requesting server at: " + msg);
+					System.out.println("[Thread-" + ind + "] Client requesting server at: " + msg);
 				}
 			}
 
-			// Send confirmation
 			objectOut.writeObject("Connected to the router.");
 			objectOut.flush();
 
-			// If this is a client connection, find the server
 			if (!isServer) {
-				System.out.println("Looking for server connection...");
-				sleep(1000);
-
-				for (int i = 0; i < RTable.length; i++) {
-					if (RTable[i][1] != null && i != ind) {
-						Socket potentialServer = (Socket) RTable[i][1];
-						if (potentialServer.isConnected() && !potentialServer.isClosed()) {
-							outSocket = potentialServer;
-							System.out.println("Found server at index: " + i);
-							break;
-						}
-					}
+				findServerThread();
+				if (serverThread != null) {
+					serverThread.setClientThread(this);
 				}
-
-				if (outSocket == null) {
-					System.err.println("No server found in routing table");
-					return;
-				}
-
-				// Initialize server connection streams - IMPORTANT: Output before Input
-				destObjectOut = new ObjectOutputStream(outSocket.getOutputStream());
-				destObjectOut.flush();
-				destObjectIn = new ObjectInputStream(outSocket.getInputStream());
-				System.out.println("Server connection streams initialized");
 			}
 
-			// Message forwarding loop
-			while (!clientSocket.isClosed()) {
+			// Main message handling loop
+			while (running && !clientSocket.isClosed()) {
 				try {
 					Object message = objectIn.readObject();
-					System.out.println("Received: " + message.getClass().getSimpleName());
+					if (message == null) break;
 
-					if (!isServer && destObjectOut != null) {
-						// Forward to server
-						destObjectOut.writeObject(message);
-						destObjectOut.flush();
+					System.out.println("[Thread-" + ind + "] Received message type: " +
+							message.getClass().getSimpleName());
 
-						// If it's matrices, wait for response
-						if (message instanceof matrix[]) {
-							Object response = destObjectIn.readObject();
-							objectOut.writeObject(response);
-							objectOut.flush();
-						}
+					if (isServer) {
+						handleServerMessage(message);
+					} else {
+						handleClientMessage(message);
 					}
 
-					if (message instanceof String && "Bye.".equals(message)) {
+					if ("Bye.".equals(message)) {
+						System.out.println("[Thread-" + ind + "] Received Bye message, closing connection");
 						break;
 					}
-				} catch (EOFException e) {
-					System.out.println("Connection ended by peer");
+				} catch (EOFException | SocketException e) {
+					// Normal socket closure
+					System.out.println("[Thread-" + ind + "] Connection closed by " +
+							(isServer ? "server" : "client"));
 					break;
-				} catch (SocketException e) {
-					System.out.println("Socket connection terminated");
+				} catch (IOException e) {
+					if (!running) break;
+					System.err.println("[Thread-" + ind + "] IO Error: " + e.getMessage());
 					break;
 				}
 			}
 		} catch (Exception e) {
-			System.err.println("Error in routing thread: " + e.getMessage());
-			e.printStackTrace();
-		} finally {
-			try {
-				if (objectOut != null) objectOut.close();
-				if (objectIn != null) objectIn.close();
-				if (destObjectOut != null) destObjectOut.close();
-				if (destObjectIn != null) destObjectIn.close();
-				if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
-			} catch (IOException e) {
-				System.err.println("Error closing resources: " + e.getMessage());
+			if (running) {
+				System.err.println("[Thread-" + ind + "] Unexpected error: " + e.getMessage());
+				e.printStackTrace();
 			}
+		} finally {
+			cleanup();
+		}
+	}
+
+	private void findServerThread() {
+		for (int i = 0; i < RTable.length; i++) {
+			if (RTable[i][1] != null && i != ind) {
+				SThread potentialServer = (SThread) RTable[i][1];
+				if (potentialServer.isServer) {
+					serverThread = potentialServer;
+					System.out.println("[Thread-" + ind + "] Found server at index: " + i);
+					return;
+				}
+			}
+		}
+		System.err.println("[Thread-" + ind + "] No server found in routing table");
+	}
+
+	public void setClientThread(SThread client) {
+		this.clientThread = client;
+		System.out.println("[Thread-" + ind + "] Set client thread: " + client.ind);
+	}
+
+	private void handleServerMessage(Object message) {
+		try {
+			if (message instanceof matrix[] || message instanceof matrix) {
+				System.out.println("[Thread-" + ind + "] Server processing message: " +
+						message.getClass().getSimpleName());
+
+				if (clientThread != null) {
+					System.out.println("[Thread-" + ind + "] Server forwarding response to client thread: " +
+							clientThread.ind);
+					clientThread.objectOut.writeObject(message);
+					clientThread.objectOut.flush();
+					System.out.println("[Thread-" + ind + "] Server sent response to client");
+				} else {
+					System.err.println("[Thread-" + ind + "] No client thread to send response to!");
+				}
+			}
+		} catch (IOException e) {
+			System.err.println("[Thread-" + ind + "] Error in server handling: " + e.getMessage());
+		}
+	}
+
+	private void handleClientMessage(Object message) {
+		if (serverThread == null) return;
+
+		try {
+			serverThread.objectOut.writeObject(message);
+			serverThread.objectOut.flush();
+			System.out.println("[Thread-" + ind + "] Forwarded to server: " +
+					message.getClass().getSimpleName());
+		} catch (IOException e) {
+			System.err.println("[Thread-" + ind + "] Error handling client message: " + e.getMessage());
+		}
+	}
+
+	private void cleanup() {
+		running = false;
+		try {
+			if (objectOut != null) objectOut.close();
+			if (objectIn != null) objectIn.close();
+			if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+
+			// Clear references
+			RTable[ind][1] = null;
+			if (isServer) {
+				clientThread = null;
+			} else {
+				serverThread = null;
+			}
+
+			System.out.println("[Thread-" + ind + "] Cleanup complete");
+		} catch (IOException e) {
+			System.err.println("[Thread-" + ind + "] Error in cleanup: " + e.getMessage());
 		}
 	}
 }

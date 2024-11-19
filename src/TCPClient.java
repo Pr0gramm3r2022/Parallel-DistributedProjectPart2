@@ -21,7 +21,7 @@ public class TCPClient {
 
             // Create object output stream first and flush
             objectOut = new ObjectOutputStream(socket.getOutputStream());
-            objectOut.flush(); // Important: flush header
+            objectOut.flush();
 
             // Then create input stream
             objectIn = new ObjectInputStream(socket.getInputStream());
@@ -46,12 +46,13 @@ public class TCPClient {
             // Generate matrices
             matrix[] matrices = new matrix[numMatrices];
             for (int i = 0; i < numMatrices; i++) {
-                matrices[i] = new matrix(MatrixGenerator.generateMatrix(matrixSize));
-                System.out.println("Generated matrix " + (i + 1));
+                matrices[i] = new matrix(MatrixGenerator.generateMatrix(matrixSize, 1, 10)); // Using smaller numbers for readability
+                System.out.println("Generated matrix " + (i + 1) + ":");
+                printMatrix(matrices[i].getMatrixData(), 100); // Print first 5x5 of each matrix
             }
 
             // Send start signal
-            System.out.println("Sending start signal");
+            System.out.println("\nSending start signal");
             objectOut.writeObject("Start");
             objectOut.flush();
 
@@ -69,24 +70,18 @@ public class TCPClient {
             System.out.println("Waiting for result...");
             Object result = objectIn.readObject();
 
-            if (result instanceof matrix[]) {
-                matrix[] resultMatrices = (matrix[]) result;
-                System.out.println("Received result matrix:");
+            if (result instanceof matrix) {
+                System.out.println("\nReceived result matrix:");
+                int[][] resultData = ((matrix) result).getMatrixData();
+                printMatrix(resultData, 100);
 
-                if (resultMatrices.length > 0) {
-                    int[][] resultData = resultMatrices[0].getMatrixData();
-                    // Print first few elements
-                    for (int i = 0; i < Math.min(5, resultData.length); i++) {
-                        for (int j = 0; j < Math.min(5, resultData[i].length); j++) {
-                            System.out.print(resultData[i][j] + " ");
-                        }
-                        System.out.println();
-                    }
-                }
+            } else {
+                System.out.println("Received unexpected result type: " +
+                        (result != null ? result.getClass().getSimpleName() : "null"));
             }
 
             // Send goodbye
-            System.out.println("Sending goodbye");
+            System.out.println("\nSending goodbye");
             objectOut.writeObject("Bye.");
             objectOut.flush();
 
@@ -96,18 +91,26 @@ public class TCPClient {
         } finally {
             System.out.println("Closing connections...");
             try {
-                if (objectOut != null) {
-                    objectOut.close();
-                }
-                if (objectIn != null) {
-                    objectIn.close();
-                }
-                if (socket != null) {
-                    socket.close();
-                }
+                if (objectOut != null) objectOut.close();
+                if (objectIn != null) objectIn.close();
+                if (socket != null) socket.close();
             } catch (IOException e) {
                 System.err.println("Error closing resources: " + e.getMessage());
             }
+        }
+    }
+
+    // Helper method to print a matrix
+    private static void printMatrix(int[][] matrix, int maxSize) {
+        int size = Math.min(maxSize, matrix.length);
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                System.out.printf("%4d ", matrix[i][j]);
+            }
+            System.out.println();
+        }
+        if (matrix.length > maxSize) {
+            System.out.println("... (matrix continues)");
         }
     }
 }
