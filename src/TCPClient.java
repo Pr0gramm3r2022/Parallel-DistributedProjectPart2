@@ -50,6 +50,9 @@ public class TCPClient {
                 System.out.println("Generated matrix " + (i + 1) + ":");
                 printMatrix(matrices[i].getMatrixData(), 100); // Print first 5x5 of each matrix
             }
+            System.out.println("Correct Answer:");
+            matrix correctAnswer = checkMath(matrices);
+            printMatrix(correctAnswer.getMatrixData(), 100);
 
             // Send start signal
             System.out.println("\nSending start signal");
@@ -112,5 +115,37 @@ public class TCPClient {
         if (matrix.length > maxSize) {
             System.out.println("... (matrix continues)");
         }
+    }
+
+    // Math Checker for matrix multiplication
+    private static matrix checkMath(matrix[] matrices) {
+        // Check matrix dimensions
+        for (int i = 0; i < matrices.length - 1; i++) {
+            int[][] matrix1 = matrices[i].getMatrixData();
+            int[][] matrix2 = matrices[i + 1].getMatrixData();
+            if (matrix1[0].length != matrix2.length) {
+                throw new IllegalArgumentException("Matrix dimensions don't match for multiplication");
+            }
+        }
+
+        // Multiply matrices
+        int[][] result = matrices[0].getMatrixData();
+        for (int i = 1; i < matrices.length; i++) {
+            int[][] matrix1 = result;
+            int[][] matrix2 = matrices[i].getMatrixData();
+            int rows = matrix1.length;
+            int cols = matrix2[0].length;
+            int[][] product = new int[rows][cols];
+            for (int j = 0; j < rows; j++) {
+                for (int k = 0; k < cols; k++) {
+                    for (int l = 0; l < matrix1[0].length; l++) {
+                        product[j][k] += matrix1[j][l] * matrix2[l][k];
+                    }
+                }
+            }
+            result = product;
+        }
+
+        return new matrix(result);
     }
 }
