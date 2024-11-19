@@ -1,66 +1,137 @@
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
+import java.util.Arrays;
 
 public class MatrixFileIO {
-    // Threshold for switching to standard multiplication -- Helps with thread overhead
-    private static final int THRESHOLD = 64;
+    private static ExecutorService executor;
+    private static int numberOfThreads = 1;
+    private static final int SEQUENTIAL_THRESHOLD = 64;
 
-    // Thread pool for Strassen multiplication
-    private static final ExecutorService executor =
-            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    // Node class for binary tree structure
+    private static class MatrixNode {
+        matrix value;
+        MatrixNode left;
+        MatrixNode right;
+        volatile Future<int[][]> result;
+        final int level;  // Track level in tree for thread allocation
 
-    // Add two matrices
-    public static int[][] addMatrices(int[][] matrix1, int[][] matrix2) {
-        if (matrix1.length != matrix2.length || matrix1[0].length != matrix2[0].length) {
-            throw new IllegalArgumentException("Matrix dimensions don't match for addition");
+        MatrixNode(matrix value, int level) {
+            this.value = value;
+            this.level = level;
+        }
+    }
+
+    public static void initializeThreadPool(int matrixCount) {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
         }
 
-        int rows = matrix1.length;
-        int cols = matrix1[0].length;
-        int[][] sum = new int[rows][cols];
-        for (int j = 0; j < rows; j++) {
-            for (int k = 0; k < cols; k++) {
-                sum[j][k] = matrix1[j][k] + matrix2[j][k];
+        // Set number of threads based on matrix count as per requirements
+        numberOfThreads = switch (matrixCount) {
+            case 2 -> 1;   // p = 1
+            case 4 -> 3;   // p = 3
+            case 8 -> 7;   // p = 7
+            case 16 -> 15; // p = 15
+            case 32 -> 31; // p = 31
+            default -> 1;  // default to single thread
+        };
+
+        System.out.println("Initializing thread pool with " + numberOfThreads + " threads for " +
+                matrixCount + " matrices");
+        executor = Executors.newFixedThreadPool(numberOfThreads);
+    }
+
+    // Build binary tree from matrix array
+    private static MatrixNode buildTree(matrix[] matrices, int start, int end, int level) {
+        if (start > end) return null;
+        if (start == end) return new MatrixNode(matrices[start], level);
+
+        int mid = (start + end) / 2;
+        MatrixNode root = new MatrixNode(null, level);
+        root.left = buildTree(matrices, start, mid, level + 1);
+        root.right = buildTree(matrices, mid + 1, end, level + 1);
+        return root;
+    }
+
+    // Process tree nodes in parallel
+    private static Future<int[][]> processNode(MatrixNode node) throws ExecutionException, InterruptedException {
+        if (node.result != null) {
+            return node.result;
+        }
+
+        if (node.left == null && node.right == null) {
+            node.result = CompletableFuture.completedFuture(node.value.getMatrixData());
+            return node.result;
+        }
+
+        // Process children first
+        Future<int[][]> leftFuture = processNode(node.left);
+        Future<int[][]> rightFuture = processNode(node.right);
+
+        // Submit multiplication task
+        node.result = executor.submit(() -> {
+            int[][] leftMatrix = leftFuture.get();
+            int[][] rightMatrix = rightFuture.get();
+            return multiplyMatrices(leftMatrix, rightMatrix);
+        });
+
+        return node.result;
+    }
+
+    // Main method for parallel matrix multiplication
+    public static int[][] resultMatrix(matrix[] matrices) throws ExecutionException, InterruptedException {
+        if (matrices.length == 1) {
+            return matrices[0].getMatrixData();
+        }
+
+        try {
+            // Build binary tree
+            MatrixNode root = buildTree(matrices, 0, matrices.length - 1, 0);
+
+            // Process tree and get final result
+            Future<int[][]> finalResult = processNode(root);
+            return finalResult.get();
+        } finally {
+            if (matrices.length <= 2) {
+                shutdown();
             }
         }
-        return sum;
     }
 
-    // Subtract two matrices
-    public static int[][] subtractMatrices(int[][] matrix1, int[][] matrix2) {
-        if (matrix1.length != matrix2.length || matrix1[0].length != matrix2[0].length) {
-            throw new IllegalArgumentException("Matrix dimensions don't match for subtraction");
+    // Single-threaded version for baseline comparison
+    public static int[][] resultMatrixSingleThread(matrix[] matrices) {
+        if (matrices.length == 1) {
+            return matrices[0].getMatrixData();
         }
 
-        int rows = matrix1.length;
-        int cols = matrix1[0].length;
-        int[][] difference = new int[rows][cols];
-        for (int j = 0; j < rows; j++) {
-            for (int k = 0; k < cols; k++) {
-                difference[j][k] = matrix1[j][k] - matrix2[j][k];
-            }
+        // Build binary tree without parallelization
+        MatrixNode root = buildTree(matrices, 0, matrices.length - 1, 0);
+        return processNodeSequential(root);
+    }
+
+    // Sequential processing for baseline comparison
+    private static int[][] processNodeSequential(MatrixNode node) {
+        if (node.left == null && node.right == null) {
+            return node.value.getMatrixData();
         }
-        return difference;
+
+        int[][] leftResult = processNodeSequential(node.left);
+        int[][] rightResult = processNodeSequential(node.right);
+
+        return standardMultiply(leftResult, rightResult);
     }
 
-    // Improved Strassen multiplication with proper multithreading
-    public static int[][] StrassenMultiplication(int[][] matrix1, int[][] matrix2)
-            throws ExecutionException, InterruptedException {
-        return strassenMultiplyRecursive(matrix1, matrix2, true);
+    private static int[][] multiplyMatrices(int[][] a, int[][] b) throws ExecutionException, InterruptedException {
+        if (a.length <= SEQUENTIAL_THRESHOLD) {
+            return standardMultiply(a, b);
+        }
+        return strassenMultiply(a, b);
     }
 
-    private static int[][] strassenMultiplyRecursive(int[][] matrix1, int[][] matrix2, boolean useThreads)
-            throws ExecutionException, InterruptedException {
+    private static int[][] strassenMultiply(int[][] matrix1, int[][] matrix2) throws ExecutionException, InterruptedException {
         int n = matrix1.length;
-
-        // Use standard multiplication for small matrices or when below threshold
-        if (n <= THRESHOLD || !useThreads) {
-            return standardMultiply(matrix1, matrix2);
-        }
-
         int size = n / 2;
+
+        // Partition matrices
         int[][] a11 = new int[size][size];
         int[][] a12 = new int[size][size];
         int[][] a21 = new int[size][size];
@@ -80,80 +151,35 @@ public class MatrixFileIO {
         split(matrix2, b21, size, 0);
         split(matrix2, b22, size, size);
 
-        // Only create threads at the top level
-        Future<int[][]> m1Future = null;
-        Future<int[][]> m2Future = null;
-        Future<int[][]> m3Future = null;
-        Future<int[][]> m4Future = null;
-        Future<int[][]> m5Future = null;
-        Future<int[][]> m6Future = null;
-        Future<int[][]> m7Future = null;
+        // Compute the seven products
+        int[][] p1 = multiplyMatrices(
+                addMatrices(a11, a22), addMatrices(b11, b22));
+        int[][] p2 = multiplyMatrices(
+                addMatrices(a21, a22), b11);
+        int[][] p3 = multiplyMatrices(
+                a11, subtractMatrices(b12, b22));
+        int[][] p4 = multiplyMatrices(
+                a22, subtractMatrices(b21, b11));
+        int[][] p5 = multiplyMatrices(
+                addMatrices(a11, a12), b22);
+        int[][] p6 = multiplyMatrices(
+                subtractMatrices(a21, a11), addMatrices(b11, b12));
+        int[][] p7 = multiplyMatrices(
+                subtractMatrices(a12, a22), addMatrices(b21, b22));
 
-        if (useThreads) {
-            m1Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            addMatrices(a11, a22), addMatrices(b11, b22), false));
-            m2Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            addMatrices(a21, a22), b11, false));
-            m3Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            a11, subtractMatrices(b12, b22), false));
-            m4Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            a22, subtractMatrices(b21, b11), false));
-            m5Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            addMatrices(a11, a12), b22, false));
-            m6Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            subtractMatrices(a21, a11), addMatrices(b11, b12), false));
-            m7Future = executor.submit(() ->
-                    strassenMultiplyRecursive(
-                            subtractMatrices(a12, a22), addMatrices(b21, b22), false));
-        }
+        // Calculate quadrants of the result
+        int[][] c11 = addMatrices(subtractMatrices(addMatrices(p1, p4), p5), p7);
+        int[][] c12 = addMatrices(p3, p5);
+        int[][] c21 = addMatrices(p2, p4);
+        int[][] c22 = addMatrices(subtractMatrices(addMatrices(p1, p3), p2), p6);
 
-        int[][] m1, m2, m3, m4, m5, m6, m7;
-
-        if (useThreads) {
-            m1 = m1Future.get();
-            m2 = m2Future.get();
-            m3 = m3Future.get();
-            m4 = m4Future.get();
-            m5 = m5Future.get();
-            m6 = m6Future.get();
-            m7 = m7Future.get();
-        } else {
-            // Sequential computation for recursive calls
-            m1 = strassenMultiplyRecursive(
-                    addMatrices(a11, a22), addMatrices(b11, b22), false);
-            m2 = strassenMultiplyRecursive(
-                    addMatrices(a21, a22), b11, false);
-            m3 = strassenMultiplyRecursive(
-                    a11, subtractMatrices(b12, b22), false);
-            m4 = strassenMultiplyRecursive(
-                    a22, subtractMatrices(b21, b11), false);
-            m5 = strassenMultiplyRecursive(
-                    addMatrices(a11, a12), b22, false);
-            m6 = strassenMultiplyRecursive(
-                    subtractMatrices(a21, a11), addMatrices(b11, b12), false);
-            m7 = strassenMultiplyRecursive(
-                    subtractMatrices(a12, a22), addMatrices(b21, b22), false);
-        }
-
-        int[][] c11 = addMatrices(subtractMatrices(addMatrices(m1, m4), m5), m7);
-        int[][] c12 = addMatrices(m3, m5);
-        int[][] c21 = addMatrices(m2, m4);
-        int[][] c22 = addMatrices(subtractMatrices(addMatrices(m1, m3), m2), m6);
-
-        // Combine results
+        // Combine quadrants into result
         return combine(c11, c12, c21, c22);
     }
 
     private static int[][] standardMultiply(int[][] matrix1, int[][] matrix2) {
         int n = matrix1.length;
         int[][] result = new int[n][n];
-
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 result[i][j] = 0;
@@ -162,7 +188,6 @@ public class MatrixFileIO {
                 }
             }
         }
-
         return result;
     }
 
@@ -175,72 +200,51 @@ public class MatrixFileIO {
     private static int[][] combine(int[][] c11, int[][] c12, int[][] c21, int[][] c22) {
         int n = c11.length * 2;
         int[][] result = new int[n][n];
-
         for (int i = 0; i < c11.length; i++) {
             System.arraycopy(c11[i], 0, result[i], 0, c11.length);
             System.arraycopy(c12[i], 0, result[i], c11.length, c11.length);
             System.arraycopy(c21[i], 0, result[i + c11.length], 0, c11.length);
             System.arraycopy(c22[i], 0, result[i + c11.length], c11.length, c11.length);
         }
-
         return result;
     }
 
-    // Recursive method to multiply a list of matrices with multithreading
-    public static int[][] resultMatrix(matrix[] matrices) throws ExecutionException, InterruptedException {
-        if (matrices.length == 1) {
-            return matrices[0].getMatrixData();
+    private static int[][] addMatrices(int[][] matrix1, int[][] matrix2) {
+        int n = matrix1.length;
+        int[][] result = new int[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                result[i][j] = matrix1[i][j] + matrix2[i][j];
+            }
         }
-
-        if (matrices.length % 2 != 0) {
-            throw new IllegalArgumentException("Number of matrices must be even for pairing");
-        }
-
-        matrix[] pairedResults = new matrix[matrices.length / 2];
-
-        // Process pairs and store results
-        for (int i = 0; i < matrices.length; i += 2) {
-            int[][] result = StrassenMultiplication(
-                    matrices[i].getMatrixData(),
-                    matrices[i + 1].getMatrixData()
-            );
-            pairedResults[i / 2] = new matrix(result);
-        }
-
-        return resultMatrix(pairedResults);
+        return result;
     }
 
-    // Single-threaded version for baseline comparison
-    public static int[][] StrassenSingleThread(int[][] matrix1, int[][] matrix2)
-            throws ExecutionException, InterruptedException {
-        return strassenMultiplyRecursive(matrix1, matrix2, false);
+    private static int[][] subtractMatrices(int[][] matrix1, int[][] matrix2) {
+        int n = matrix1.length;
+        int[][] result = new int[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                result[i][j] = matrix1[i][j] - matrix2[i][j];
+            }
+        }
+        return result;
     }
 
-    public static int[][] resultMatrixSingleThread(matrix[] matrices)
-            throws ExecutionException, InterruptedException {
-        if (matrices.length == 1) {
-            return matrices[0].getMatrixData();
-        }
-
-        if (matrices.length % 2 != 0) {
-            throw new IllegalArgumentException("Number of matrices must be even for pairing");
-        }
-
-        matrix[] pairedResults = new matrix[matrices.length / 2];
-
-        for (int i = 0; i < matrices.length; i += 2) {
-            int[][] result = StrassenSingleThread(
-                    matrices[i].getMatrixData(),
-                    matrices[i + 1].getMatrixData()
-            );
-            pairedResults[i / 2] = new matrix(result);
-        }
-
-        return resultMatrixSingleThread(pairedResults);
-    }
-
-    // Add shutdown method to clean up executor
     public static void shutdown() {
-        executor.shutdown();
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+            }
+        }
+    }
+
+    public static int getCurrentThreadCount() {
+        return numberOfThreads;
     }
 }
